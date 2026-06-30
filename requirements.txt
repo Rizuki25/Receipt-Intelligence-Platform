@@ -1,0 +1,22 @@
+# Receipt Intelligence Platform - Dependencies
+# Phase 3: YOLO11 Training
+
+# Core
+ultralytics>=8.3.0     # YOLO11 framework (YOLO11 tersedia di versi 8.3+)
+torch>=2.0.0           # PyTorch (install versi CUDA jika pakai GPU)
+torchvision>=0.15.0
+
+# Data & Utilities
+numpy>=1.24.0
+opencv-python>=4.8.0
+Pillow>=10.0.0
+pyyaml>=6.0
+
+# Visualisasi & Logging
+matplotlib>=3.7.0
+pandas>=2.0.0
+seaborn>=0.12.0
+tqdm>=4.65.0
+
+# (Opsional) untuk GPU monitoring
+# nvidia-ml-py3
