@@ -1,0 +1,21 @@
+{
+  "image": "struk-2.png",
+  "items": [
+    {
+      "name": "REAL GANACHE",
+      "qty": null,
+      "price": 16500
+    },
+    {
+      "name": "EGG TART",
+      "qty": null,
+      "price": 13000
+    },
+    {
+      "name": "PIZZA TOAST",
+      "qty": null,
+      "price": 16000
+    }
+  ],
+  "total": 45500
+}

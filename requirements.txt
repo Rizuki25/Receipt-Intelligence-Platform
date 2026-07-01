@@ -1,10 +1,15 @@
 # Receipt Intelligence Platform - Dependencies
 # Phase 3: YOLO11 Training
+# Phase 4: OCR (PaddleOCR)
 
-# Core
+# Core - YOLO
 ultralytics>=8.3.0     # YOLO11 framework (YOLO11 tersedia di versi 8.3+)
 torch>=2.0.0           # PyTorch (install versi CUDA jika pakai GPU)
 torchvision>=0.15.0
+
+# Core - OCR
+paddlepaddle==2.6.1    # PaddlePaddle framework (CPU version stabil)
+paddleocr==2.8.1       # PaddleOCR untuk baca teks dari struk
 
 # Data & Utilities
 numpy>=1.24.0
