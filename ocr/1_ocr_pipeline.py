@@ -207,7 +207,9 @@ def process_image(
             f"      - Class: {d['class']:<6} | Conf: {d['conf']:.2f} | Y: {d['center_y']:.1f} | OCR Text: '{d['text']}'"
         )
 
-    structured = organize_detections(detections)
+    structured = organize_detections(
+        detections, img=img, ocr=ocr, header_ratio=header_ratio
+    )
 
     print(f"    Items terdeteksi: {len(structured['items'])}")
     print(f"    Total           : {structured['total']}")
@@ -304,13 +306,79 @@ def find_total_by_keyword(img: np.ndarray, ocr: PaddleOCR) -> int | None:
 
 
 def organize_detections(
-    detections: list[dict], img: np.ndarray = None, ocr: PaddleOCR = None
+    detections: list[dict],
+    img: np.ndarray = None,
+    ocr: PaddleOCR = None,
+    header_ratio: float = 0.20,
 ) -> dict:
     """
     Kelompokkan deteksi berdasarkan baris (Y position).
     Item, qty, dan price di baris yang sama biasanya adalah satu produk.
     """
-    # Pisahkan berdasarkan kelas
+    # 1. Tentukan toleransi Y dinamis berdasarkan tinggi bounding box rata-rata
+    box_heights = [d["bbox"][3] - d["bbox"][1] for d in detections]
+    Y_TOLERANCE = max(30, int(np.mean(box_heights) * 1.2)) if box_heights else 35
+
+    h_img, w_img = img.shape[:2] if img is not None else (1000, 1000)
+    header_y = h_img * header_ratio
+
+    # 2. Jika YOLO mendeteksi price/qty tapi melewatkan item (low confidence),
+    #    gunakan fallback OCR pada area sebelah kiri price/qty untuk merekonstruksi item.
+    if img is not None and ocr is not None:
+        init_items = [d for d in detections if d["class"] == "item"]
+        prices = [d for d in detections if d["class"] == "price"]
+        qtys = [d for d in detections if d["class"] == "qty"]
+        added_items = []
+
+        # Cari fallback untuk price/qty yang tidak berjodoh dengan item apapun
+        for p in sorted(prices + qtys, key=lambda x: x["center_y"]):
+            p_ctr_y = p["center_y"]
+
+            # Abaikan jika ada di area header
+            if p_ctr_y <= header_y:
+                continue
+
+            # Periksa kecocokan vertikal
+            has_match = False
+            for it in init_items + added_items:
+                if abs(it["center_y"] - p_ctr_y) <= Y_TOLERANCE:
+                    has_match = True
+                    break
+
+            if not has_match:
+                # Crop area sebelah kiri price/qty
+                x1_p, y1_p, x2_p, y2_p = p["bbox"]
+                y_pad = 5
+                crop_y1 = max(0, int(y1_p - y_pad))
+                crop_y2 = min(h_img, int(y2_p + y_pad))
+                crop_x1 = 0
+                crop_x2 = max(0, int(x1_p - 10))
+
+                if (crop_x2 - crop_x1) > 50 and (crop_y2 - crop_y1) > 10:
+                    crop_img = img[crop_y1:crop_y2, crop_x1:crop_x2]
+                    fallback_text = read_text_from_crop(ocr, crop_img)
+
+                    if fallback_text:
+                        fallback_text = fallback_text.strip()
+                        alpha_chars = [c for c in fallback_text if c.isalpha()]
+                        # Tambahkan jika teks cukup bermakna (mengandung setidaknya 3 huruf)
+                        if len(alpha_chars) >= 3:
+                            new_item = {
+                                "class": "item",
+                                "conf": 1.0,
+                                "bbox": [crop_x1, crop_y1, crop_x2, crop_y2],
+                                "center_y": (crop_y1 + crop_y2) / 2,
+                                "text": fallback_text,
+                            }
+                            added_items.append(new_item)
+                            print(
+                                f"    [OCR FALLBACK ITEM] Berhasil mendeteksi item virtual: '{fallback_text}' pada Y: {p_ctr_y:.1f}"
+                            )
+
+        # Gabungkan deteksi virtual
+        detections.extend(added_items)
+
+    # Pisahkan berdasarkan kelas terbaru
     items = [d for d in detections if d["class"] == "item"]
     qtys = [d for d in detections if d["class"] == "qty"]
     prices = [d for d in detections if d["class"] == "price"]
@@ -318,9 +386,6 @@ def organize_detections(
 
     # Urutkan item berdasarkan posisi vertikal
     items.sort(key=lambda d: d["center_y"])
-
-    # Ambang toleransi Y untuk mencocokkan qty & price dengan item (dalam pixel)
-    Y_TOLERANCE = 25
 
     structured_items = []
     for item in items:
