@@ -30,7 +30,6 @@ from ultralytics import YOLO
 
 # ── Konfigurasi Default ───────────────────────────────────────────────────────
 
-RUN_NAME = "receipt_yolo11"
 CONF_THRESHOLD = 0.35
 IOU_THRESHOLD = 0.45
 IMG_SIZE = 640
@@ -54,16 +53,13 @@ DEFAULT_HEADER_RATIO = 0.20
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-def find_best_model(run_name: str) -> Path | None:
-    """Cari best.pt secara dinamis di seluruh subfolder runs/."""
+def find_best_model() -> Path | None:
+    """Pilih checkpoint best.pt terbaru agar hasil fine-tuning yang digunakan."""
     if not Path("runs").exists():
         return None
-    candidates = list(Path("runs").rglob(f"{run_name}/weights/best.pt"))
-    if candidates:
-        return candidates[0]
     candidates = list(Path("runs").rglob("best.pt"))
     if candidates:
-        return candidates[0]
+        return max(candidates, key=lambda path: path.stat().st_mtime)
     return None
 
 
@@ -145,11 +141,17 @@ def draw_filtered_result(result, keep_mask: list[bool], output_path: Path) -> No
     cv2.imwrite(str(output_path), img)
 
 
+def result_output_path(out_dir: Path, image_name: str) -> Path:
+    """Buat nama output yang berbeda dari gambar sumber."""
+    source_name = Path(image_name)
+    return out_dir / f"{source_name.stem}_detected{source_name.suffix}"
+
+
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 
 def parse_args():
-    found_model = find_best_model(RUN_NAME)
+    found_model = find_best_model()
     default_model = (
         str(found_model)
         if found_model
@@ -233,7 +235,7 @@ def main():
         if boxes is None or len(boxes) == 0:
             print("    Tidak ada objek terdeteksi.")
             # Simpan gambar asli tanpa anotasi
-            cv2.imwrite(str(out_dir / img_name), result.orig_img)
+            cv2.imwrite(str(result_output_path(out_dir, img_name)), result.orig_img)
             continue
 
         # Terapkan filter header
@@ -262,7 +264,9 @@ def main():
                 print(f"    {cls_name:<10}: {count} deteksi")
 
         # Simpan gambar dengan bbox yang sudah difilter
-        out_path = out_dir / img_name
+        # Gunakan nama berbeda agar gambar sumber tidak pernah tertimpa. Ini juga
+        # mencegah inference berikutnya membaca bbox yang sudah digambar.
+        out_path = result_output_path(out_dir, img_name)
         draw_filtered_result(result, keep_mask, out_path)
 
         if args.show:

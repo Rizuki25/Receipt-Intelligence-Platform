@@ -1,10 +1,10 @@
 # YOLO11 Dataset Configuration
 # Receipt Intelligence Platform
 
-path: D:/Kerjaan/Struk-Monitoring-AI/dataset   # absolute path ke root dataset
+path: D:/Kerjaan/Struk-Monitoring-AI/dataset
 
-train: data/images/train   # relatif terhadap 'path'
-val:   data/images/val     # relatif terhadap 'path'
+train: data/images/train
+val: data/images/val
 
-nc: 4          # jumlah kelas
+nc: 4
 names: ['item', 'price', 'total', 'qty']
